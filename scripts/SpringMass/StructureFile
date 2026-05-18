@@ -1,0 +1,36 @@
+CONTROL
+"imp69"
+1
+"nodeset"
+"elemset"
+*
+INCLUDE "../../sources/mesh.include.andesshell"
+*
+PRESSURE 1
+1 12202 -676.0
+*
+FORCE 2
+1027  2 -2000
+2450  2  2000
+*
+FORCE 3
+10524 1 -200000
+*
+LOADCASE 1
+1 1.0
+2 1.0
+*
+LOADCASE 2
+1 1.0
+3 1.0
+*
+STATICS 
+sparse
+cases 1 2
+*
+OUTPUT
+gdisplac "results/gdisplac" 1
+stressvm "results/stressvm" 1 upper
+strainvm "results/strainvm" 1 upper
+*
+END
