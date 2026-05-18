@@ -4,33 +4,28 @@ CONTROL
 "nodeset"
 "elemset"
 *
-INCLUDE "../../sources/mesh.include.andesshell"
+INCLUDE "springmass.txt"
 *
-PRESSURE 1
-1 12202 -676.0
-*
-FORCE 2
-1027  2 -2000
-2450  2  2000
-*
-FORCE 3
-10524 1 -200000
-*
+FORCE 1
+2 1 10
+MFTT
+0 1
 LOADCASE 1
 1 1.0
-2 1.0
-*
-LOADCASE 2
-1 1.0
-3 1.0
 *
 STATICS 
 sparse
-cases 1 2
+cases 1
+*
+DYNAMICS
+IACC On 
+STABLE 1 0.8 1E-3 100 1000 0 0 
+MECH 0 0.5
+TIME 1e-1 1e-1 10
 *
 OUTPUT
 gdisplac "results/gdisplac" 1
-stressvm "results/stressvm" 1 upper
-strainvm "results/strainvm" 1 upper
+*stressvm "results/stressvm" 1
+*strainvm "results/strainvm" 1 upper
 *
 END

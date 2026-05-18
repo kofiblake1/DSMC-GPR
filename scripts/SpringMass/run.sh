@@ -9,4 +9,4 @@ mpirun -np 1 $AEROS StructureFile |& tee log.out
 
 ###
 mpirun -np 1 $AEROS -t StructureFile
-$XP2EXO imp69.top postpro/Case5.exo results/gdisplac results/strainvm results/stressvm
+$XP2EXO imp69.top postpro/Case5.exo results/gdisplac # results/strainvm results/stressvm
