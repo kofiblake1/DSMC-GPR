@@ -1,0 +1,68 @@
+################################################################################
+# 2d flow around porous media
+#
+# Note:
+#  - The "comm/sort” option to the “global” command is used to match MPI runs.
+#  - The “twopass” option is used to match Kokkos runs.
+# The "comm/sort" and "twopass" options should not be used for production runs.
+################################################################################
+
+seed	    	    12345
+dimension   	    ${DIM}
+log		    ${RUN}/${SAMPLE}/log.sparta
+boundary	    o o p
+
+global              gridcut 0.0 comm/sort yes
+create_box  	    ${X_MIN} ${X_MAX} ${Y_MIN} ${Y_MAX} ${Z_MIN} ${Z_MAX}
+create_grid         100 100 1 levels 2 subset 2 * * * 5 5 1 
+write_grid 			${RUN}/${SAMPLE}/initial.grid
+balance_grid	    rcb cell
+
+read_surf           ${MESH} 
+#write_surf	    ${RUN}/refinedsurf.circle
+
+global		    nrho 4.247e17 fnum 1.0e11
+
+species		    argon.species Ar 
+mixture		    Ar Ar vstream ${U_INF} 0 0 temp 200
+
+fix		    in emit/face Ar xlo twopass
+create_particles    Ar n 0
+
+# compute             THERMAL thermal/grid all Ar temp press
+# compute             OUTPUT grid all Ar u v n nrho temp massrho
+# fix                 OUTPUT ave/grid all 1 100 100 c_THERMAL[*] c_OUTPUT[*]
+
+collide             vss Ar argon.vss
+# compute             toMFP1 grid all species nrho
+# compute 	    	toMFP2 thermal/grid all all temp
+
+# compute             MFP lambda/grid c_toMFP1[*] c_toMFP2[1] lambda tau knall
+# fix                 MFP ave/grid all 1 100 100 c_MFP[*]
+# dump                GRID_OUT grid all 100 ${RUN}/${OUT}.* id f_OUTPUT[*] f_MFP[*]
+
+# Surface Calculations
+# compute 	    surfCalcs surf all all n press shx shy ke fx fy mflux
+# fix		    surfCalcs ave/surf all 1 10 10 c_surfCalcs[*]
+#dump		    surfDump surf all 500 ${RUN}/${OUT}surf.* id f_surfCalcs[*]
+
+# compute		    surf_etot surf all all n mflux press etot ke shx shy fx fy
+# fix				surf_avg ave/surf all 1 100 100 c_surf_etot[*]
+# dump		    surfetot surf all 100 ${RUN}/${OUT}surf.* id f_surf_avg[*] f_surfCalcs[*]
+
+surf_collide	    1 diffuse 500 1.0
+surf_modify         all collide 1
+
+# Adapt Grid
+#fix 		    gridupdate adapt 100 all refine coarsen value f_MFP[3] 4 20  combine min thresh less more &
+#		    file ${RUN}/${RUN}*.grid 
+#fix		    gridupdate2 adapt 50 all refine surf all 1e-8
+#fix                 check grid/check 100 warn
+
+timestep 	    5e-7
+
+fix                 bal balance 100 1.001 rcb part
+stats		    1
+stats_style	    step cpu np npave ngrid nattempt ncoll nscoll nscollave nscheck
+
+#run		   50000               
