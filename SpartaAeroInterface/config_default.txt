@@ -1,0 +1,12 @@
+sparta_input_file       in.ablation.2d
+run_name                surf_no_ablation
+data                    out
+surf_file               refinedsurf.circle
+to_paraview             true
+dim                     2
+x_min                   -2e-2
+x_max                   2e-2
+y_min                   -2e-2  
+y_max                   2e-2
+z_min                   -2e-2
+z_max                   2e-2
