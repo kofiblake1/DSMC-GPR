@@ -1,0 +1,39 @@
+Mesh export summary: CYLINDER_VALIDATION_COARSE
+Generated: 2026-07-21T11:40:34
+
+Geometry
+--------
+Circle: radius=1.0, center=(0.0, 0.0), lc_fraction=0.1
+
+Mesh stats
+----------
+Total nodes: 424
+Total 2D elements: 780
+Boundary nodes: 64
+
+Materials
+---------
+id area E poisson density conv cond thickness perimeter ref_temp cp therm_exp ixx iyy izz ymin ymax zmin zmax
+1 0.0 15000000000.0 0.3 3000.0 0.0 3.0 1.0 0.0 0.0 1000.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+Default material id (ATTR): 1
+
+Element codes
+-------------
+Structural: 4
+Heat: 46
+
+Default nodal temperature
+-------------------------
+300.0
+
+Displacement boundary conditions
+---------------------------------
+(none)
+
+Generated files
+---------------
+struct_mesh: CYLINDER_VALIDATION_COARSE/CYLINDER_VALIDATION_COARSE_aero_struct.txt
+heat_mesh: CYLINDER_VALIDATION_COARSE/CYLINDER_VALIDATION_COARSE_aero_heat.txt
+sparta: CYLINDER_VALIDATION_COARSE/CYLINDER_VALIDATION_COARSE_sparta.txt
+mapping: CYLINDER_VALIDATION_COARSE/CYLINDER_VALIDATION_COARSE_mapping.txt
+stl: CYLINDER_VALIDATION_COARSE/CYLINDER_VALIDATION_COARSE_surface.stl
