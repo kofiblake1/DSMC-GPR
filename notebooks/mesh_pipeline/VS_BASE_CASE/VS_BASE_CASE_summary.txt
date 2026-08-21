@@ -1,0 +1,45 @@
+Mesh export summary: VS_BASE_CASE
+Generated: 2026-08-07T11:17:37
+
+Geometry
+--------
+Circle: radius=0.5, center=(0.0, 0.0), lc_fraction=0.1
+
+Coupling
+--------
+default: 1:1 SPARTA<->AERO-S node correspondence, full interior AERO-S mesh
+
+Mesh stats
+----------
+Total AERO-S nodes: 424
+Total AERO-S elements: 780
+SPARTA boundary nodes: 64
+Active SPARTA boundary elements: 64/64
+
+Materials
+---------
+id area E poisson density conv cond thickness perimeter ref_temp cp therm_exp ixx iyy izz ymin ymax zmin zmax
+1 0.0 15000000000.0 0.3 3000.0 0.0 3.0 1.0 0.0 0.0 1000.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
+Default material id (ATTR): 1
+
+Element codes
+-------------
+Structural: 4
+Heat: 46
+
+Default nodal temperature
+-------------------------
+300.0
+
+Displacement boundary conditions
+---------------------------------
+(none)
+
+Generated files
+---------------
+struct_mesh: VS_BASE_CASE/VS_BASE_CASE_aero_struct.txt
+heat_mesh: VS_BASE_CASE/VS_BASE_CASE_aero_heat.txt
+sparta: VS_BASE_CASE/VS_BASE_CASE_sparta.txt
+mapping: VS_BASE_CASE/VS_BASE_CASE_mapping.txt
+stl: VS_BASE_CASE/VS_BASE_CASE_surface.stl
+coupling_plot: VS_BASE_CASE/VS_BASE_CASE_coupling.png

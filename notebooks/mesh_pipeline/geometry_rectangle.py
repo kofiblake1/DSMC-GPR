@@ -3,8 +3,15 @@
 import gmsh
 
 
-def build_rectangle(title, width, height, origin=(0.0, 0.0), lc=1e-3):
-    """Build and mesh a rectangular plane surface. Returns the surface tag."""
+def build_rectangle(title, width, height, origin=(0.0, 0.0), lc=1e-3, element_type="tri"):
+    """Build and mesh a rectangular plane surface. Returns the surface tag.
+
+    element_type: "tri" for 3-node triangles (default) or "quad" for 4-node
+        quadrilaterals (gmsh recombines the triangulation into quads).
+    """
+    if element_type not in ("tri", "quad"):
+        raise ValueError(f"unknown element_type: {element_type!r}")
+
     gmsh.initialize()
     gmsh.model.add(title)
 
@@ -29,6 +36,8 @@ def build_rectangle(title, width, height, origin=(0.0, 0.0), lc=1e-3):
     surface = gmsh.model.geo.addPlaneSurface([curve_loop])
 
     gmsh.model.geo.synchronize()
+    if element_type == "quad":
+        gmsh.model.mesh.setRecombine(2, surface)
     gmsh.model.mesh.generate(2)
 
     return surface

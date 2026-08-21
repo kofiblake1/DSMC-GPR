@@ -8,8 +8,15 @@ so the caller can pass it to export_coupled_mesh() to recover physical units.
 import gmsh
 
 
-def build_circle(title, radius, center=(0.0, 0.0), lc_fraction=1e-2, internal_scale_factor=None):
-    """Build and mesh a circular plane surface. Returns (surface, internal_scale_factor)."""
+def build_circle(title, radius, center=(0.0, 0.0), lc_fraction=1e-2, internal_scale_factor=None, element_type="tri"):
+    """Build and mesh a circular plane surface. Returns (surface, internal_scale_factor).
+
+    element_type: "tri" for 3-node triangles (default) or "quad" for 4-node
+        quadrilaterals (gmsh recombines the triangulation into quads).
+    """
+    if element_type not in ("tri", "quad"):
+        raise ValueError(f"unknown element_type: {element_type!r}")
+
     gmsh.initialize()
     gmsh.model.add(title)
 
@@ -38,6 +45,8 @@ def build_circle(title, radius, center=(0.0, 0.0), lc_fraction=1e-2, internal_sc
     surface = gmsh.model.geo.addPlaneSurface([curve_loop])
 
     gmsh.model.geo.synchronize()
+    if element_type == "quad":
+        gmsh.model.mesh.setRecombine(2, surface)
     gmsh.model.mesh.generate(2)
 
     return surface, internal_scale_factor

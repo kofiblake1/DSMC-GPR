@@ -14,6 +14,7 @@ geometry you need in its place. Run:
 import gmsh
 import numpy as np
 
+from coupling import Coupling, NodeSelector
 from displacement import DisplacementGroup
 from materials import Material
 from mesh_export import export_coupled_mesh
@@ -78,8 +79,37 @@ geometry_description = f"NACA0012 airfoil: chord={CHORD}, aoa={AOA_DEG} deg, lc=
 
 # --- End example -------------------------------------------------------------
 
+# -----------------------------------------------------------------------------
+# ELEMENT TYPE
+# -----------------------------------------------------------------------------
+# "tri"  - 3-node triangles (default AERO-S TOPO codes: struct=4, heat=46).
+# "quad" - 4-node quadrilaterals (gmsh recombines the mesh into quads).
+#          Verify HEAT_ELEM_CODE below against your AERO-S element library -
+#          the quad heat element code varies with convection/radiation setup
+#          (e.g. 46/48/58/4646).
+ELEMENT_TYPE = "tri"  # "tri" or "quad"
+
+if ELEMENT_TYPE == "tri":
+    STRUCT_ELEM_CODE = 4
+    HEAT_ELEM_CODE = 46
+elif ELEMENT_TYPE == "quad":
+    STRUCT_ELEM_CODE = 2
+    HEAT_ELEM_CODE = 48  # TODO: confirm against your AERO-S heat element library
+else:
+    raise ValueError(f"unknown ELEMENT_TYPE: {ELEMENT_TYPE!r}")
+
 gmsh.model.geo.synchronize()
+if ELEMENT_TYPE == "quad":
+    gmsh.model.mesh.setRecombine(2, surface)
 gmsh.model.mesh.generate(2)
+
+# -----------------------------------------------------------------------------
+# VISUALIZATION
+# -----------------------------------------------------------------------------
+# Set True to open the native gmsh GUI right after meshing, so you can inspect
+# the geometry/mesh before export continues. Closing the window resumes the
+# script.
+VISUALIZE = False
 
 # -----------------------------------------------------------------------------
 # MATERIAL
@@ -121,8 +151,36 @@ DISPLACEMENT_GROUPS = [
 ]
 
 # -----------------------------------------------------------------------------
+# COUPLING MODE
+# -----------------------------------------------------------------------------
+# How the AERO-S side relates to the SPARTA boundary. SPARTA always gets the
+# full 2D perimeter of the geometry; only the AERO-S side/mapping changes:
+#   "default"           - 1:1 correspondence, full interior AERO-S mesh.
+#   "zero_dimensional"  - collapse AERO-S to a single node; every SPARTA
+#                         boundary element's load sums onto that one node.
+#   "partial"           - AERO-S is a subset of the SPARTA boundary nodes
+#                         selected by simple coordinate conditions, e.g.
+#                         NodeSelector(axis="x", op="<=", value=0.0).
+COUPLING_MODE = "partial"  # "default", "zero_dimensional", or "partial"
+
+if COUPLING_MODE == "default":
+    COUPLING = Coupling.default()
+elif COUPLING_MODE == "zero_dimensional":
+    ZERO_D_AERO_NODE_ID = 1  # user-chosen AERO-S node id
+    COUPLING = Coupling.zero_dimensional(aero_node_id=ZERO_D_AERO_NODE_ID)
+elif COUPLING_MODE == "partial":
+    COUPLING = Coupling.partial([
+        NodeSelector(axis="x", op="<=", value=0.0),
+    ])
+else:
+    raise ValueError(f"unknown COUPLING_MODE: {COUPLING_MODE!r}")
+
+# -----------------------------------------------------------------------------
 # EXPORT
 # -----------------------------------------------------------------------------
+if VISUALIZE:
+    gmsh.fltk.run()
+
 generated_files = export_coupled_mesh(
     surface=surface,
     title=TITLE,
@@ -130,9 +188,12 @@ generated_files = export_coupled_mesh(
     materials=MATERIALS,
     displacement_groups=DISPLACEMENT_GROUPS if DO_DISP else None,
     default_material_id=DEFAULT_MATERIAL_ID,
+    struct_elem_code=STRUCT_ELEM_CODE,
+    heat_elem_code=HEAT_ELEM_CODE,
     default_temperature=DEFAULT_TEMPERATURE,
     internal_scale_factor=INTERNAL_SCALE_FACTOR,
     geometry_description=geometry_description,
+    coupling=COUPLING,
 )
 
 gmsh.finalize()
