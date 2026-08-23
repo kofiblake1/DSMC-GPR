@@ -54,12 +54,20 @@ ST = 0.3
 # restarts from a different checkpoint.
 RESTART_TIME_OFFSET = 100000 * 1e-6
 
-# Which tip displacement component to analyze: 'y' (transverse -- the
-# vortex-shedding-driven bending direction, analogous to lift) or 'x'
-# (axial -- mostly geometric foreshortening from large-deflection bending,
-# analogous to drag in that it's a secondary/rectified response).
-TIP_COMPONENT = 'y'
+# Which tip displacement quantity to analyze: 'y' (transverse -- the
+# vortex-shedding-driven bending direction, analogous to lift), 'x' (axial
+# -- mostly geometric foreshortening from large-deflection bending,
+# analogous to drag in that it's a secondary/rectified response), or
+# 'magnitude' (sqrt(x^2+y^2+z^2) -- always >= 0). Note magnitude only
+# folds/doubles the apparent frequency if the underlying signal actually
+# crosses zero; for this cantilever the tip typically bends to one side and
+# oscillates around a nonzero mean rather than crossing y=0, so magnitude's
+# FFT peak usually lands at the same frequency as 'y', just with the DC/mean
+# offset baked in differently -- verify against 'y'/'x' rather than assuming
+# either behavior.
+# TIP_COMPONENT = 'y'
 # TIP_COMPONENT = 'x'
+TIP_COMPONENT = 'magnitude'
 
 # Peak-detection threshold in fft_and_peaks(), as a fraction of that
 # signal's own peak FFT magnitude (not a fixed absolute value -- lift, drag,
@@ -122,7 +130,13 @@ def main():
     time_ld, lift, drag = load_lift_drag(LIFT_DRAG_FILE, ST)
     time_tip, tip_x, tip_y, tip_z = load_tip_displacement(
         GDISPLAC_FILE, RESTART_TIME_OFFSET, ST)
-    tip_disp = {'x': tip_x, 'y': tip_y, 'z': tip_z}[TIP_COMPONENT]
+    tip_options = {
+        'x': tip_x,
+        'y': tip_y,
+        'z': tip_z,
+        'magnitude': np.sqrt(tip_x**2 + tip_y**2 + tip_z**2),
+    }
+    tip_disp = tip_options[TIP_COMPONENT]
     tip_label = f"Tip disp. {TIP_COMPONENT} [m]"
 
     dt_ld = time_ld[1] - time_ld[0]
