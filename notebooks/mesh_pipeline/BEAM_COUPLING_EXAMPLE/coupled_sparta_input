@@ -1,0 +1,52 @@
+################################################################################
+# Beam-coupling example: rarefied flow around a thin rectangle outline
+# coupled to a 1D AERO-S beam via fix AERO_S_beam / SpartaBeamExchanger.
+# See README.md in this directory for how to run this and what to expect.
+################################################################################
+
+seed	    	    12345
+dimension   	    2
+log		    EXAMPLE/log.sparta
+boundary	    o o p
+
+global              gridcut 0.0 comm/sort yes
+create_box  	    -3 5 -2.5 2.5 -0.5 0.5
+create_grid         50 50 1 levels 2 subset 2 * * * 4 4 1
+write_grid 	    EXAMPLE/initial.grid
+balance_grid	    rcb cell
+timestep 	    1e-5
+
+read_surf           beam_coupling_example_sparta.txt
+
+global		    nrho 1.58e20 fnum 1e15
+species		    air.species N O
+mixture		    air N O vstream 161.34 0 0 temp 300
+fix		    in emit/face air xlo twopass
+create_particles    air n 0
+
+compute             THERMAL thermal/grid all air temp press
+compute             OUTPUT grid all air u v n nrho temp massrho
+fix                 OUTPUT ave/grid all 1 10 1000 c_THERMAL[*] c_OUTPUT[*]
+dump 		    OUTPUT grid all 1000 EXAMPLE/grid_data.* id f_OUTPUT[*]
+
+collide             vss air air.vss
+
+surf_collide	    1 diffuse 1000 1.0
+surf_modify         all collide 1
+
+adapt_grid	    all refine surf all 1e-12 iterate 8
+write_grid	    EXAMPLE/refined_grid
+
+# AERO-S beam coupling
+compute         sp surf all all ke fx fy
+fix             sp ave/surf all 1 90 100 c_sp[*]
+compute		force reduce sum f_sp[2] f_sp[3]
+dump            sp surf all 100 EXAMPLE/DUMP id f_sp[*]
+
+fix             couple_beam AERO_S_beam all 100 f_sp[2] f_sp[3] beam_coupling_example_beam_mapping.txt beam_vel
+
+fix                 bal balance 100 1.001 rcb part
+stats		    100
+stats_style	    step cpu c_force[1] c_force[2] np npave ngrid nattempt ncoll nscoll nscollave nscheck
+
+run		   500

@@ -1,0 +1,38 @@
+Beam mesh export summary: beam_coupling_example
+Generated: 2026-08-21T15:32:11
+
+Beam geometry
+-------------
+Beam nodes: 6
+  1: (0.0, -0.5)
+  2: (0.0, -0.3)
+  3: (0.0, -0.09999999999999998)
+  4: (0.0, 0.09999999999999998)
+  5: (0.0, 0.30000000000000004)
+  6: (0.0, 0.5)
+
+Materials
+---------
+1 0.2 200000.0 0.0 100.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1e-09 1e-09 0.0006666666666666669 0.0 0.0 0.0 0.0
+Default material id (ATTR): 1
+
+Fixed DOFs
+----------
+  beam node 1: dofs [1, 2, 3, 4, 5, 6]
+  beam node 2: dofs [3, 4, 5]
+  beam node 3: dofs [3, 4, 5]
+  beam node 4: dofs [3, 4, 5]
+  beam node 5: dofs [3, 4, 5]
+  beam node 6: dofs [3, 4, 5]
+
+Projection stats
+----------------
+SPARTA boundary nodes: 20
+xi range: [0.000000, 1.000000]
+gap magnitude: min=0.000000e+00 max=1.000000e-01 mean=9.000000e-02
+Clamped (out-of-span) nodes: 0/20
+
+Generated files
+---------------
+beam_struct: BEAM_COUPLING_EXAMPLE/beam_coupling_example_beam_struct.txt
+beam_mapping: BEAM_COUPLING_EXAMPLE/beam_coupling_example_beam_mapping.txt

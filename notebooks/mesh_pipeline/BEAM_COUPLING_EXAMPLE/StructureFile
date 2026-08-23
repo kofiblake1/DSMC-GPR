@@ -1,0 +1,20 @@
+CONTROL
+"beam_coupling_example"
+1
+"nodeset"
+"elemset"
+*
+INCLUDE "beam_coupling_example_beam_struct.txt"
+*
+DSMCBEAM "beam_coupling_example_beam_mapping.txt"
+*
+DYNAMICS
+IACC On
+STABLE 1 0.8 1E-3 100 1000 0 0
+MECH 0.0 0.5 0.0 0.0
+TIME 1e-3 1e-3 5e-3
+*
+OUTPUT
+gdisplac "results/gdisplac" 1
+*
+END

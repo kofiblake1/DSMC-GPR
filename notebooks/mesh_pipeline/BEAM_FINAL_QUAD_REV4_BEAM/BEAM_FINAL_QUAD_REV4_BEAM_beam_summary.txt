@@ -1,0 +1,108 @@
+Beam mesh export summary: BEAM_FINAL_QUAD_REV4_BEAM
+Generated: 2026-08-21T15:34:47
+
+Beam geometry
+-------------
+Beam nodes: 41
+  1: (0.0, -0.5)
+  2: (0.0, -0.475)
+  3: (0.0, -0.45)
+  4: (0.0, -0.425)
+  5: (0.0, -0.4)
+  6: (0.0, -0.375)
+  7: (0.0, -0.35)
+  8: (0.0, -0.325)
+  9: (0.0, -0.3)
+  10: (0.0, -0.275)
+  11: (0.0, -0.25)
+  12: (0.0, -0.22499999999999998)
+  13: (0.0, -0.2)
+  14: (0.0, -0.175)
+  15: (0.0, -0.15000000000000002)
+  16: (0.0, -0.125)
+  17: (0.0, -0.09999999999999998)
+  18: (0.0, -0.07500000000000001)
+  19: (0.0, -0.04999999999999999)
+  20: (0.0, -0.025000000000000022)
+  21: (0.0, 0.0)
+  22: (0.0, 0.025000000000000022)
+  23: (0.0, 0.050000000000000044)
+  24: (0.0, 0.07499999999999996)
+  25: (0.0, 0.09999999999999998)
+  26: (0.0, 0.125)
+  27: (0.0, 0.15000000000000002)
+  28: (0.0, 0.17500000000000004)
+  29: (0.0, 0.19999999999999996)
+  30: (0.0, 0.22499999999999998)
+  31: (0.0, 0.25)
+  32: (0.0, 0.275)
+  33: (0.0, 0.30000000000000004)
+  34: (0.0, 0.32499999999999996)
+  35: (0.0, 0.35)
+  36: (0.0, 0.375)
+  37: (0.0, 0.4)
+  38: (0.0, 0.42500000000000004)
+  39: (0.0, 0.44999999999999996)
+  40: (0.0, 0.475)
+  41: (0.0, 0.5)
+
+Materials
+---------
+1 0.02 618000.0 0.0 0.0058 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1e-09 1e-09 6.666666666666668e-07 0.0 0.0 0.0 0.0
+Default material id (ATTR): 1
+
+Fixed DOFs
+----------
+  beam node 1: dofs [1, 2, 3, 4, 5, 6]
+  beam node 2: dofs [3, 4, 5]
+  beam node 3: dofs [3, 4, 5]
+  beam node 4: dofs [3, 4, 5]
+  beam node 5: dofs [3, 4, 5]
+  beam node 6: dofs [3, 4, 5]
+  beam node 7: dofs [3, 4, 5]
+  beam node 8: dofs [3, 4, 5]
+  beam node 9: dofs [3, 4, 5]
+  beam node 10: dofs [3, 4, 5]
+  beam node 11: dofs [3, 4, 5]
+  beam node 12: dofs [3, 4, 5]
+  beam node 13: dofs [3, 4, 5]
+  beam node 14: dofs [3, 4, 5]
+  beam node 15: dofs [3, 4, 5]
+  beam node 16: dofs [3, 4, 5]
+  beam node 17: dofs [3, 4, 5]
+  beam node 18: dofs [3, 4, 5]
+  beam node 19: dofs [3, 4, 5]
+  beam node 20: dofs [3, 4, 5]
+  beam node 21: dofs [3, 4, 5]
+  beam node 22: dofs [3, 4, 5]
+  beam node 23: dofs [3, 4, 5]
+  beam node 24: dofs [3, 4, 5]
+  beam node 25: dofs [3, 4, 5]
+  beam node 26: dofs [3, 4, 5]
+  beam node 27: dofs [3, 4, 5]
+  beam node 28: dofs [3, 4, 5]
+  beam node 29: dofs [3, 4, 5]
+  beam node 30: dofs [3, 4, 5]
+  beam node 31: dofs [3, 4, 5]
+  beam node 32: dofs [3, 4, 5]
+  beam node 33: dofs [3, 4, 5]
+  beam node 34: dofs [3, 4, 5]
+  beam node 35: dofs [3, 4, 5]
+  beam node 36: dofs [3, 4, 5]
+  beam node 37: dofs [3, 4, 5]
+  beam node 38: dofs [3, 4, 5]
+  beam node 39: dofs [3, 4, 5]
+  beam node 40: dofs [3, 4, 5]
+  beam node 41: dofs [3, 4, 5]
+
+Projection stats
+----------------
+SPARTA boundary nodes: 408
+xi range: [0.000000, 1.000000]
+gap magnitude: min=2.541890e-14 max=1.000000e-02 mean=9.901961e-03
+Clamped (out-of-span) nodes: 0/408
+
+Generated files
+---------------
+beam_struct: BEAM_FINAL_QUAD_REV4_BEAM/BEAM_FINAL_QUAD_REV4_BEAM_beam_struct.txt
+beam_mapping: BEAM_FINAL_QUAD_REV4_BEAM/BEAM_FINAL_QUAD_REV4_BEAM_beam_mapping.txt
