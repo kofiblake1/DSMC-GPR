@@ -147,13 +147,13 @@ velocityLUTColorBar = GetScalarBar(velocityLUT, renderView1)
 velocityLUT.DataHistogramNumberOfBins = 200
 
 # Rescale transfer function
-velocityLUT.RescaleTransferFunction(0.0, 325.0)
+velocityLUT.RescaleTransferFunction(0.0, 300.0)
 
 # Rescale transfer function
-velocityPWF.RescaleTransferFunction(0.0, 325.0)
+velocityPWF.RescaleTransferFunction(0.0, 300.0)
 
 # Rescale 2D transfer function
-velocityTF2D.RescaleTransferFunction(0.0, 325.0, 0.0, 1.0)
+velocityTF2D.RescaleTransferFunction(0.0, 300.0, 0.0, 1.0)
 
 # set active source
 SetActiveSource(annotateTimeFilter1)

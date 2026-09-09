@@ -33,17 +33,17 @@ from scipy.signal import find_peaks
 # ============================================================================
 # CONFIG -- point this at whichever run's output you want to analyze.
 # ============================================================================
-RUN_DIR = "/scratch/users/kofib/DSMC_FEM_VALIDATION_P1/BEAM_LOCKIN/PHASE_1"
-# RUN_DIR = "/scratch/users/kofib/DSMC_FEM_VALIDATION_P1/BEAM_LOCKIN/PHASE_2/E_0.396MPa"
+#RUN_DIR = "/Volumes/SherlockScratch/DSMC_FEM_VALIDATION_P1/BEAM_LOCKIN/PHASE_1"
+RUN_DIR = "/Volumes/SherlockScratch/DSMC_FEM_VALIDATION_P1/BEAM_LOCKIN/PHASE_2R/PHASE_2R_SWEEP/f1_1p05/"
 
 LIFT_DRAG_FILE = os.path.join(RUN_DIR, "EXAMPLE_BEAM", "lift_drag.dat")
 GDISPLAC_FILE = os.path.join(RUN_DIR, "results_beam", "gdisplac")
-OUTPUT_DIR = RUN_DIR  # PNGs land here; change if you'd rather they land elsewhere
+OUTPUT_DIR = os.getcwd() #RUN_DIR  # PNGs land here; change if you'd rather they land elsewhere
 
 # Only look at data after this SPARTA absolute time (matches the original
 # notebook's st=0.3) -- skips the initial transient before the flow and
 # structural response settle into their statistically-steady regime.
-ST = 0.3
+ST = 0.0
 
 # gdisplac's own time column resets to 0.0 at the start of structural
 # coupling (AERO-S's internal DYNAMICS clock), while lift_drag.dat's time
@@ -52,7 +52,7 @@ ST = 0.3
 # datasets share one absolute time axis: restart_step * SPARTA dt (1e-6).
 # = 0.1 s for PHASE_1/PHASE_2's restart.100000 -- update if a future run
 # restarts from a different checkpoint.
-RESTART_TIME_OFFSET = 100000 * 1e-6
+RESTART_TIME_OFFSET = 250000 * 1e-5
 
 # Which tip displacement quantity to analyze: 'y' (transverse -- the
 # vortex-shedding-driven bending direction, analogous to lift), 'x' (axial
@@ -67,7 +67,7 @@ RESTART_TIME_OFFSET = 100000 * 1e-6
 # either behavior.
 # TIP_COMPONENT = 'y'
 # TIP_COMPONENT = 'x'
-TIP_COMPONENT = 'magnitude'
+TIP_COMPONENT = 'y'
 
 # Peak-detection threshold in fft_and_peaks(), as a fraction of that
 # signal's own peak FFT magnitude (not a fixed absolute value -- lift, drag,
@@ -155,12 +155,12 @@ def main():
     ax2.set_xlabel("Time")
 
     ax3.plot(time_tip, tip_disp)
-    ax3.plot(time_tip, moving_average(tip_disp), color='red', label='Windowed Average')
+    # ax3.plot(time_tip, moving_average(tip_disp), color='red', label='Windowed Average')
     ax3.set_ylabel(tip_label)
     ax3.set_xlabel("Time")
 
     plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, "timeseries.png"), dpi=150)
+    plt.savefig(os.path.join(OUTPUT_DIR, "timeseries.png"), dpi=600)
     plt.close(fig)
 
     # -- FFT + dominant peak detection ---------------------------------------
@@ -183,7 +183,7 @@ def main():
     ax3.set_xlabel("Frequency [Hz]")
 
     plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, "fft.png"), dpi=150)
+    plt.savefig(os.path.join(OUTPUT_DIR, "fft.png"), dpi=600)
     plt.close(fig)
 
     # -- Continuous wavelet transform (time-frequency) -----------------------
@@ -208,7 +208,7 @@ def main():
     ax3.set_yscale("log")
 
     plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, "cwt.png"), dpi=150)
+    plt.savefig(os.path.join(OUTPUT_DIR, "cwt.png"), dpi=600)
     plt.close(fig)
 
     print(f"\nSaved timeseries.png, fft.png, cwt.png to {OUTPUT_DIR}")

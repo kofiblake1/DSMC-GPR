@@ -9,7 +9,7 @@ import gmsh
 from coupling import Coupling
 from displacement import DisplacementGroup
 from geometry_circle import build_circle
-from materials import Material
+from materials import Material, RigidMaterial, is_rigid_struct_elem_code
 from mesh_export import export_coupled_mesh
 
 # -----------------------------------------------------------------------------
@@ -30,7 +30,7 @@ LC_FRACTION = 1e-1  # mesh size as a fraction of radius
 #          Verify HEAT_ELEM_CODE below against your AERO-S element library -
 #          the quad heat element code varies with convection/radiation setup
 #          (e.g. 46/48/58/4646).
-ELEMENT_TYPE = "tri"  # "tri" or "quad"
+ELEMENT_TYPE = "tri"  # "tri" or "quad" -- controls gmsh mesh generation only
 
 if ELEMENT_TYPE == "tri":
     STRUCT_ELEM_CODE = 4
@@ -40,6 +40,22 @@ elif ELEMENT_TYPE == "quad":
     HEAT_ELEM_CODE = 48  # TODO: confirm against your AERO-S heat element library
 else:
     raise ValueError(f"unknown ELEMENT_TYPE: {ELEMENT_TYPE!r}")
+
+# Set True to make every element a rigid element instead: overrides
+# STRUCT_ELEM_CODE with RIGID_STRUCT_ELEM_CODE (AERO-S codes 65-76, excluding
+# 72 and 75) and switches the MATERIAL section below to the simple "id
+# CONMAT" line. The gmsh mesh itself (tri/quad, per ELEMENT_TYPE above) is
+# unaffected.
+USE_RIGID_ELEMENT = False
+RIGID_STRUCT_ELEM_CODE = 65  # only used when USE_RIGID_ELEMENT is True
+
+if USE_RIGID_ELEMENT:
+    if not is_rigid_struct_elem_code(RIGID_STRUCT_ELEM_CODE):
+        raise ValueError(
+            f"RIGID_STRUCT_ELEM_CODE={RIGID_STRUCT_ELEM_CODE!r} is not a rigid "
+            "element code (must be 65-76, excluding 72 and 75)."
+        )
+    STRUCT_ELEM_CODE = RIGID_STRUCT_ELEM_CODE
 
 # -----------------------------------------------------------------------------
 # VISUALIZATION
@@ -52,26 +68,35 @@ VISUALIZE = False
 # -----------------------------------------------------------------------------
 # MATERIAL
 # -----------------------------------------------------------------------------
+# Rigid elements (USE_RIGID_ELEMENT above) only need an id and the CONMAT
+# keyword; regular elements use the full AERO-S MATERIAL line:
 # MATERIAL id area youngs_modulus poisson_ratio density convection_coeff
 #           conduction_coeff elem_thickness perimeter ref_temp cp
 #           coeff_therm_expans ixx iyy izz ymin ymax zmin zmax
-MATERIALS = [
-    Material(
-        id=1,
-        area=0.0,
-        youngs_modulus=15e9,
-        poisson_ratio=0.3,
-        density=3e3,
-        convection_coeff=0.0,
-        conduction_coeff=3.0,
-        elem_thickness=1.0,
-        perimeter=0.0,
-        ref_temp=0.0,
-        cp=1000.0,
-        coeff_therm_expans=0.0,
-    ),
-    # Add more Material(...) entries here if the mesh needs multiple materials.
-]
+if USE_RIGID_ELEMENT:
+    MATERIALS = [
+        RigidMaterial(id=1),
+        # RigidMaterial(id=1, density=..., thickness=...),  # adds "MASS density thickness"
+        # Add more RigidMaterial(...) entries here if needed.
+    ]
+else:
+    MATERIALS = [
+        Material(
+            id=1,
+            area=0.0,
+            youngs_modulus=15e9,
+            poisson_ratio=0.3,
+            density=3e3,
+            convection_coeff=0.0,
+            conduction_coeff=3.0,
+            elem_thickness=1.0,
+            perimeter=0.0,
+            ref_temp=0.0,
+            cp=1000.0,
+            coeff_therm_expans=0.0,
+        ),
+        # Add more Material(...) entries here if the mesh needs multiple materials.
+    ]
 DEFAULT_MATERIAL_ID = 1  # material id referenced by ATTR for every element
 DEFAULT_TEMPERATURE = 300.0
 
