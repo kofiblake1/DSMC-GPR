@@ -24,8 +24,14 @@ The subtree is structured *as if it will one day be extracted into its own repo*
 that separation (if/when it happens) is a directory move rather than a disentangling
 project. Until then, it shares the parent repo's git history and remote.
 
-<!-- TODO: confirm the exact subtree folder name (rarefied-surrogate/ vs rarefied/)
-     and the parent-repo path it lives under. -->
+**Confirmed (2026-09-12):** the subtree folder name is `rarefied-surrogate/` (not
+`rarefied/`), living at the top level of the parent repo
+`DSMC-GPR` (`github.com/kofiblake1/DSMC-GPR`, remote `origin`) — i.e. this file's
+path is `DSMC-GPR/rarefied-surrogate/README.md`. The sibling direct-coupling
+project's code lives in `DSMC-GPR`'s other top-level directories (`SpartaAeroInterface/`,
+`scripts/`, `notebooks/`, etc.) — see `src/rarefied/sparta/README.md` for one
+concrete place this boundary was tested during the 2026-09-12 cleanup (and where
+it turned out to be less clean than assumed).
 
 ---
 
@@ -51,8 +57,8 @@ not part of this work.
 rarefied-surrogate/
   README.md                  # this file — the map and conventions
   PIPELINE.md                # the data-flow spec (keystone; read first)
-  environment.yml            # conda env / dependencies      <!-- TODO -->
-  pyproject.toml             # makes src/ installable (pip install -e .)  <!-- TODO -->
+  environment.yml            # conda env / dependencies      [done 2026-09-12]
+  pyproject.toml             # makes src/ installable (pip install -e .)  [done 2026-09-12]
 
   config/
     cases/                   # one config per case
@@ -60,37 +66,59 @@ rarefied-surrogate/
     schema.md                # what every config field means  <!-- TODO -->
 
   src/rarefied/              # ALL logic lives here — importable, tested
-    geometry/                # analytic shape + surface-station generation
+    geometry/                # analytic shape + surface-station generation  [populated 2026-09-12]
     sparta/                  # sampling-region + run setup for the custom interface
-    aerof/                   # mesh + input-deck generation; base-state extraction
-    moments/                 # the hand-derived moment functions (canonical)
-    reconstruct/             # moments + run info -> dimensional surface fluxes
-    io/                      # loaders: pickles, VDF data, configs, registry
-    features/                # feature-vector assembly (planned)
-    models/                  # GP foundation + fine-tune (planned)
+                             #   [C++ interface documented 2026-09-12, see its README.md;
+                             #    no Python wrapper code yet]
+    aerof/                   # mesh + input-deck generation; base-state extraction  (still empty)
+    moments/                 # the hand-derived moment functions (canonical)  [populated 2026-09-12]
+    reconstruct/             # moments + run info -> dimensional surface fluxes  [populated 2026-09-12]
+    io/                      # loaders: pickles, VDF data, configs, registry  [populated 2026-09-12]
+    features/                # feature-vector assembly (planned)  (still empty)
+    models/                  # GP foundation + fine-tune (planned)  (still empty)
 
   scripts/                   # thin CLI entry points; each calls into src/
                              #   one per pipeline stage (see PIPELINE.md)
+                             #   still empty as of 2026-09-12 -- no CLI entry points yet
 
   notebooks/
     exploratory/             # fast, messy, disposable scratchpads (not pipeline)
     validation/              # thin notebooks that reproduce paper figures
 
   tests/
-    regression/              # "does it still reproduce known-good results?"
+    characterization/        # [new, 2026-09-12] frozen current-behavior snapshots,
+                             #   used to verify each Phase 3-5 relocation was non-destructive --
+                             #   NOT the same as a validated regression test, see below
+    regression/              # "does it still reproduce known-good results?"  still empty
 
   data/
-    README.md                # WHERE the real data lives (paths), not the data
-    registry.yaml            # manifest: dataset -> path, format, provenance
+    README.md                # WHERE the real data lives (paths), not the data  <!-- TODO -->
+    registry.yaml            # manifest: dataset -> path, format, provenance  [populated 2026-09-12,
+                             #   local paths only -- cluster paths still FILL_IN]
 
   docs/
     decisions/               # locked modeling decisions + rationale
-    handoffs/                # Claude Code handoff docs (argon-cylinder CFD, etc.)
+    handoffs/                # Claude Code handoff docs (argon-cylinder CFD, etc.)  <!-- still empty,
+                             #   see CLEANUP_TODO.md CONFIRM #7 -->
+    CLEANUP_TODO.md           # [new, 2026-09-12] the dependency-ordered cleanup plan and its
+                             #   full record of what was found, moved, and left as open CONFIRMs
 ```
 
 The directory tree deliberately **mirrors the pipeline stages** (geometry → sampling
 → runs → moments → reconstruction). `ls src/rarefied/` should let a new reader infer
 the architecture.
+
+**Known mismatch, flagged 2026-09-12, not yet resolved:** the two notebooks that
+were promoted from (`process_shape_data.ipynb`, `proess_3D_distributions.ipynb`)
+physically live inside `src/rarefied/geometry/` and `src/rarefied/moments/`
+respectively — not under a top-level `notebooks/` folder as this tree diagram
+shows. Moving them would risk breaking the relative paths added during the
+2026-09-12 relocation (e.g. each notebook's registry lookup assumes its specific
+depth under `src/rarefied/<subpackage>/`), so they were left in place rather than
+moved as a side effect of an unrelated cleanup pass. Whether they belong in
+`notebooks/exploratory/`, `notebooks/validation/`, or should just stay where they
+are (since they now only contain the non-load-bearing plotting/demo cells) is an
+open question — see `docs/CLEANUP_TODO.md`.
 
 ---
 
@@ -149,26 +177,38 @@ referenced — never committed.**
   self-describing, language-agnostic one — HDF5/NPZ — but that's optional hardening,
   not now.)
 
-<!-- TODO: fill in data/registry.yaml with the real cluster paths and the local
-     pickle locations, plus provenance for each dataset. -->
+**Status (2026-09-12):** local pickle locations and provenance are filled in (see
+`data/registry.yaml`). Cluster paths are still `<!-- TODO -->` — that needs a
+cluster-connected session to confirm, not guessed at from here.
 
 ---
 
 ## Quickstart
 
 ```bash
-# 1. environment
-conda env create -f environment.yml        # <!-- TODO: create environment.yml -->
-conda activate rarefied                     # <!-- TODO: confirm env name -->
+# 1. environment  [environment.yml created 2026-09-12; env name confirmed: rarefied]
+conda env create -f environment.yml
+conda activate rarefied
 
-# 2. make the package importable
-pip install -e .                            # <!-- TODO: create pyproject.toml -->
+# 2. make the package importable  [pyproject.toml created 2026-09-12]
+python3.10 -m pip install -e .
 
 # 3. run a stage (see PIPELINE.md for the full list)
-python scripts/<stage>.py --case config/cases/argon_cylinder.yaml   # <!-- TODO -->
+python scripts/<stage>.py --case config/cases/argon_cylinder.yaml   # <!-- TODO: no
+                                                                     #      scripts/ entry
+                                                                     #      points exist yet -->
 
-# 4. reproduce the known-good validation result (guards the crown jewels)
-pytest tests/regression                     # <!-- TODO: write this test -->
+# 4. verify a relocation didn't change behavior (2026-09-12 -- NOT the same as #5 below)
+python3.10 tests/characterization/build_reference.py   # freezes current output
+# (then diff a re-run against the frozen .npz -- see docs/CLEANUP_TODO.md's
+# Phase 3 methodology for the actual diff script; this is characterization,
+# not validation)
+
+# 5. reproduce the known-good validation result (guards the crown jewels)
+pytest tests/regression                     # <!-- TODO: still not written --
+                                              #      tests/characterization/ is not
+                                              #      a substitute, see PIPELINE.md's
+                                              #      Regression test section -->
 ```
 
 <!-- TODO: replace <stage> placeholders once scripts/ entry points exist. -->
@@ -186,3 +226,10 @@ automated shape + data generation across both solvers. See
 
 *Draft v0.1 — expect to iterate. Placeholders marked `TODO` / `FILL IN` are the
 checklist to reconcile against the existing code and cluster layout.*
+
+*2026-09-12: first reconciliation pass — package scaffolding, `data/registry.yaml`
+local entries, and the `src/rarefied/{moments,reconstruct,io,geometry}/`
+promotions are done; see `docs/CLEANUP_TODO.md` for the full record, including
+several open questions this pass surfaced rather than resolved (the notebook-location
+mismatch above, the SPARTA scope question in `src/rarefied/sparta/README.md`, and
+others in that file's CONFIRM list).*

@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pywt
 from scipy.ndimage import median_filter, uniform_filter1d
-from scipy.signal import find_peaks
+from scipy.signal import butter, find_peaks, sosfiltfilt
 
 # ============================================================================
 # CONFIG -- point this at whichever run's output you want to analyze.
@@ -53,7 +53,7 @@ ST = 0.0
 # datasets share one absolute time axis: restart_step * SPARTA dt (1e-6).
 # = 0.1 s for PHASE_1/PHASE_2's restart.100000 -- update if a future run
 # restarts from a different checkpoint.
-RESTART_TIME_OFFSET = 250000 * 1e-5
+RESTART_TIME_OFFSET = 0#250000 * 1e-5
 
 # Which tip displacement quantity to analyze: 'y' (transverse -- the
 # vortex-shedding-driven bending direction, analogous to lift), 'x' (axial
@@ -75,9 +75,25 @@ TIP_COMPONENT = 'y'
 # and tip displacement live on completely different physical scales, so a
 # single hardcoded threshold, as the original notebook used, can't work for
 # all three at once).
-RELATIVE_PEAK_HEIGHT = 0.05
+RELATIVE_PEAK_HEIGHT = 0.9
 
 WINDOW = 10  # samples, for the moving-average overlay
+
+# -- Low-pass filter ---------------------------------------------------------
+# Cutoff [Hz] for the extra low-pass-filtered FFT figure: content above this
+# is rejected before re-running the FFT, which pulls the physically meaningful
+# low-frequency peaks out from under the broadband DSMC statistical noise (the
+# particle-noise floor extends all the way to Nyquist). 300 Hz keeps the
+# shedding frequency and its first several harmonics for this problem.
+# Must stay below the Nyquist frequency of BOTH signals -- lift/drag is
+# sampled at 1/dt_ld and the tip at 1/dt_tip, and these differ; lowpass()
+# warns and passes the signal through untouched if the cutoff is too high.
+LOWPASS_CUTOFF = 300.0
+# Butterworth order. Applied via sosfiltfilt (forward-backward), so the
+# effective rolloff is twice this order and the filter is zero-phase -- no
+# time shift, which matters because these traces are compared against each
+# other and against the unfiltered CWT.
+LOWPASS_ORDER = 4
 
 # -- 3D CWT surface settings --------------------------------------------------
 # Frequency band to show in the 3D surfaces. The CWT's own band here is
@@ -137,6 +153,23 @@ def fft_and_peaks(signal, dt, label, relative_height=RELATIVE_PEAK_HEIGHT):
     for f, a in zip(freq[peak_idx][order], mag[peak_idx][order]):
         print(f"-> Frequency: {f:.2f} Hz | Amplitude: {a:.2f}")
     return freq, mag, freq[peak_idx][order], mag[peak_idx][order]
+
+
+def lowpass(signal, dt, cutoff, order=LOWPASS_ORDER, label=''):
+    """Zero-phase Butterworth low-pass. Returns a filtered copy of signal.
+
+    The mean is removed before filtering and added back afterwards: filtfilt's
+    edge padding assumes a signal near zero, and the tip displacement has a
+    large nonzero mean (the beam's static deflection), which would otherwise
+    produce a big startup transient at both ends."""
+    nyq = 0.5 / dt
+    if cutoff >= nyq:
+        print(f"WARNING: low-pass cutoff {cutoff:g} Hz >= Nyquist "
+              f"{nyq:.1f} Hz for {label} -- leaving it unfiltered.")
+        return signal.copy()
+    sos = butter(order, cutoff / nyq, btype='low', output='sos')
+    mean = signal.mean()
+    return sosfiltfilt(sos, signal - mean) + mean
 
 
 def moving_average(x, window=WINDOW):
@@ -248,6 +281,45 @@ def main():
     plt.savefig(os.path.join(OUTPUT_DIR, "fft.png"), dpi=600)
     plt.close(fig)
 
+    # -- Same FFT after low-pass filtering -----------------------------------
+    lift_lp = lowpass(lift, dt_ld, LOWPASS_CUTOFF, label="Lift")
+    drag_lp = lowpass(drag, dt_ld, LOWPASS_CUTOFF, label="Drag")
+    tip_lp = lowpass(tip_disp, dt_tip, LOWPASS_CUTOFF, label="Tip disp.")
+
+    cut = f"low-pass {LOWPASS_CUTOFF:g} Hz"
+    freq_lift_lp, lift_fft_lp, lift_pf_lp, lift_pm_lp = fft_and_peaks(
+        lift_lp, dt_ld, f"Lift, {cut}")
+    freq_drag_lp, drag_fft_lp, drag_pf_lp, drag_pm_lp = fft_and_peaks(
+        drag_lp, dt_ld, f"Drag, {cut}")
+    freq_tip_lp, tip_fft_lp, tip_pf_lp, tip_pm_lp = fft_and_peaks(
+        tip_lp, dt_tip, f"Tip disp. ({TIP_COMPONENT}), {cut}")
+
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=False, figsize=(8, 9))
+
+    # Show the raw spectrum faintly behind the filtered one so the stopband
+    # rejection (and the fact that no in-band peak moved) is visible directly.
+    for ax, freq, dt, raw, mag, pf, pm, ylabel in (
+        (ax1, freq_lift, dt_ld, lift_fft, lift_fft_lp, lift_pf_lp, lift_pm_lp, "Lift FFT"),
+        (ax2, freq_drag, dt_ld, drag_fft, drag_fft_lp, drag_pf_lp, drag_pm_lp, "Drag FFT"),
+        (ax3, freq_tip, dt_tip, tip_fft, tip_fft_lp, tip_pf_lp, tip_pm_lp, f"{tip_label} FFT"),
+    ):
+        ax.plot(freq, raw, color='0.8', lw=0.7, label='Raw')
+        ax.plot(freq, mag, color='C0', lw=0.9, label=f'Filtered ({cut})')
+        ax.axvline(LOWPASS_CUTOFF, color='black', lw=0.9, linestyle=':',
+                   label='Cutoff')
+        # Plot out past the cutoff so the rolloff and stopband are visible,
+        # but never past that signal's own Nyquist.
+        ax.set_xlim(0, min(1.6 * LOWPASS_CUTOFF, 0.5 / dt))
+        ax.set_ylabel(ylabel)
+        for f, a in zip(pf, pm):
+            ax.vlines(f, 0, a, color='red', linestyle='--', alpha=0.7)
+    ax1.legend(fontsize=8)
+    ax3.set_xlabel("Frequency [Hz]")
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, "fft_lowpass.png"), dpi=600)
+    plt.close(fig)
+
     # -- Continuous wavelet transform (time-frequency) -----------------------
     scales = np.arange(1, 128)
     lift_cwt, cwt_freqs_ld = pywt.cwt(lift - lift.mean(), scales, "morl", sampling_period=dt_ld)
@@ -332,7 +404,8 @@ def main():
     plt.savefig(os.path.join(OUTPUT_DIR, "cwt3d.png"), dpi=300)
     plt.close(fig)
 
-    print(f"\nSaved timeseries.png, fft.png, cwt.png, cwt3d.png to {OUTPUT_DIR}")
+    print(f"\nSaved timeseries.png, fft.png, fft_lowpass.png, cwt.png, "
+          f"cwt3d.png to {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":

@@ -20,3 +20,9 @@ __pycache__/
 # Large output data
 output/
 results/
+
+# Images
+*.png
+*.pdf
+*.jpg
+*.jpeg

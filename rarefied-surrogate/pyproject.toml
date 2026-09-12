@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rarefied"
+version = "0.1.0"
+description = "DSMC-informed Gaussian Process surrogate for surface fluxes in rarefied external flow"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "scikit-learn",
+    "matplotlib",
+    "pyyaml",
+    "circle-fit",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
