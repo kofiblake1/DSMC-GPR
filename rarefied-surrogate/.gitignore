@@ -1,0 +1,66 @@
+# ---- Data: never commit; it lives on the cluster, referenced via registry.yaml ----
+# (registry.yaml itself IS committed — it's just paths/provenance)
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.vtk
+*.vtu
+*.plt
+*.dat
+data/
+!data/README.md
+!data/registry.yaml
+
+# ---- SPARTA / AERO-F run artifacts & large outputs ----
+*.log
+dump.*
+log.*
+*.restart
+*.surf
+*.grid
+runs/
+outputs/
+results/
+*.out
+
+# ---- Notebook cruft ----
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# ---- Python packaging / caches ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+build/
+dist/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+.conda/
+
+# ---- Editor / OS ----
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*~
+
+# ---- Figures: usually regenerated; keep out unless a figure is a deliverable ----
+*.png
+*.pdf
+*.jpg
+*.jpeg
+!docs/**/*.png
+!docs/**/*.pdf
