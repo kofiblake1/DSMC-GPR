@@ -105,7 +105,34 @@ Each stage lists: **Consumes · Produces · Format · Location · Command · Cod
   define-vs-inspect rule.
 - **Status:** promoted from `process_shape_data.ipynb`; relocation verified against
   `tests/characterization/geometry_reference.npz` (bit-for-bit on a small local
-  input). **Not yet promoted:** no CLI entry point in `scripts/`.
+  input).
+
+**Added 2026-09-12 — `src/rarefied/geometry/curves.py`,** the curve front-end
+for the AERO-F side. A curve is an `(N, 2)` closed loop, **clockwise** (M13),
+recentred on its area centroid, resampled to `n_surf` points equispaced in arc
+length, with index 0 anchored where the +x ray from the centroid crosses the
+surface. Sources: `circle(diameter, n_pts)` (analytic, exact — the validation
+target) and `from_shape(shape)` (the upstream Bezier generator, loaded by path
+via `aerof/shapes_bridge.py` so `$SHAPES_DIR` stays a pristine clone with its
+commit hash recorded per run). `validate()` is the cheap first gate — it runs
+before gmsh is ever invoked and rejects self-intersections, near-duplicate
+points, wrong orientation, and ambiguous station origins.
+
+**Stations (M6).** `aerof/geo.stations(curve, n_station)` returns indices into
+the wall curve, so every station id is an **exact mesh node** — stage [4c] can
+read the base state at a station with no interpolation, because
+`Transfinite Curve {…} = 2` pins the mesh wall nodes to exactly the curve
+points (verified to 7.85e-17 on the circle).
+`n_surf` (mesh resolution, M4) and `n_station` (registration count, M6) are
+**independent**: an earlier version derived the wall cell size as
+`perimeter/n_surf`, which coupled them, and that is now a documented fallback
+only. The on-disk station **manifest format is still open** — only indices are
+recorded today (in `<case>.record.json` under `stations`).
+
+**Not yet promoted:** `generate_circle_shape` (SPARTA side) and `curves.circle`
+(AERO-F side) are two analytic circle generators. Both are now clockwise and
+both start at `(+r, 0)`, so they agree — but they have not been unified, and
+whether they should be is open.
 
 ### [2] Sampling-region generation (SPARTA side)
 - **Consumes:** station manifest [1]; sampling params (normal offset, band size).
@@ -154,21 +181,73 @@ Each stage lists: **Consumes · Produces · Format · Location · Command · Cod
 
 ### [4] AERO-F base predictor
 Sub-stages share one solver run.
-- **[4a] Mesh:** hyperbolic extrusion on the (convex) analytic geometry; far-field
-  keyed to shock standoff; wall spacing set by a **wall-gradient convergence study**
-  (not y+). Code: `src/rarefied/aerof/`. `FILL IN mesh tool: GMSH? built-in?`
-- **[4b] Run:** laminar, no-slip, compressible steady NS. `FILL IN: solver params for
-  convergence` (this is an open item — see the argon-cylinder handoff).
-- **[4c] Base-state extraction:** at each station, read (ρ, u, T) at the frozen wall
-  reference; apply a-posteriori first-order Maxwell slip (velocity + temperature
-  jump) from the near-wall gradients; also emit the near-wall gradients as features.
-- **Consumes:** analytic geometry + station manifest [1]; case config.
+
+- **[4a] Mesh — implemented 2026-09-12.** Graded unstructured **gmsh** mesh
+  (M4 as amended; hyperbolic extrusion is no longer required — see the M4
+  Amendment for why orthogonality is irrelevant to the consumed product).
+  A `.geo` is generated from the curve and meshed by the **gmsh CLI as a
+  subprocess** (`aerof/gmsh_env.sh`), never by importing gmsh — the gmsh module
+  forces `gcc/10.1.0`, which breaks the py312 numeric stack.
+  Two hard format constraints, both set by `gmsh2top`:
+  **MSH 2.2 only** (it cannot read 4.1, and its version-4 branch targets 4.0)
+  and **no `Recombine`** (it accepts only element types 2 and 4, so the
+  extrusion must yield tetrahedra).
+  Wall spacing is `size_min_factor` — per M4 from a wall-gradient convergence
+  study, **not yet run**, so cases carry `FILL_IN` and the code falls back to
+  `perimeter/n_surf`. Far-field is a fixed `20 D` stand-in for M4's
+  shock-standoff rule.
+  - **Code:** `src/rarefied/aerof/{geo,mshio,quality,topfile,partition,pipeline}.py`
+  - **Command:** `python3 scripts/gen_mesh.py --case config/cases/circle_1m.yaml`
+    (batch: `scripts/gen_mesh_batch.py`, `scripts/gen_mesh_batch.sbatch`)
+  - **Produces:** `.geo`, `.msh`, `.top`, `.top.dec.N`, sower's
+    `.msh1/.dec1/.con/.Ncpu`, plus `.png`/`.vtu`/`.quality.txt`/`.record.json`
+  - **Gate:** `aerof/quality.py` checks group areas against analytic values,
+    total volume, **zero non-positive tet volumes**, wall node count
+    `= 2 x n_surf`, wall nodes lying on the input curve, and exactly two
+    extrusion planes. The area checks do double duty: they are the only thing
+    verifying gmsh's `Extrude` lateral-surface ordering, so a change there
+    fails loudly instead of silently mislabelling boundary conditions.
+
+- **[4b] Run:** laminar, no-slip, compressible steady NS.
+  - **Command:** `scripts/prep_aerof_case.sh` → `scripts/run_aerof.sh` →
+    `scripts/postpro_aerof.sh`
+  - **Status:** the chain is **verified end to end** on the reference circle
+    (see `docs/handoffs/aerof_mesh_and_case2.md`), but with the *tutorial's*
+    settings — air, turbulent closure, wall functions. That is a smoke test,
+    not this project's physics.
+  - **Open (user-owned):** solver settings — flux, CFL law, limiter,
+    reconstruction, supersonic startup. Not a pipeline concern; see the M4
+    Amendment. AERO-F's flux options are `Roe`, `VanLeer`, `HLLE`, `HLLC`,
+    `RotatedRiemann` (`IoDataCore.C:3313-3315`); there is no AUSM.
+  - **Note:** `StickMoving` is an *adiabatic* wall (`BcDef.h:23`), so wall heat
+    flux is **zero by definition** unless a `SurfaceData` block promotes it to
+    isothermal (`SubDomainCore.C:2914`). That promotion requires the physical
+    group name to carry a trailing `_N` surface id, which `aerof/geo.py`
+    emits for exactly this reason.
+
+- **[4c] Base-state extraction — not yet implemented.** At each station, read
+  (ρ, u, T) at the frozen wall reference; apply a-posteriori first-order
+  Maxwell slip from the near-wall gradients (M3); emit the gradients as
+  features. Mechanism is now pinned down — see *Contract D*.
+
+- **Consumes:** analytic geometry + stations [1]; case config.
 - **Produces:** per-station **base state** + slip-corrected wall state + gradients.
-- **Format:** see *Contract D*.
-- **Location:** cluster; register outputs. `FILL IN`
-- **Command:** `python scripts/run_aerof.py --case <case.yaml>`  `FILL IN`
-- **Status:** setup infrastructure exists (built with Claude Code on the cluster);
-  **first task is the argon-cylinder CFD reproduction.**
+- **Location:** cluster, under `$SCRATCH`; registered in `data/registry.yaml`.
+
+#### Capability tiers (documented, not enforced — M12)
+
+| tier | modules | runs |
+|---|---|---|
+| pure Python | `geometry/curves`, `aerof/mshio`, `aerof/quality` | anywhere |
+| needs gmsh | `aerof/geo` | cluster (or a local gmsh) |
+| needs the group binaries | `aerof/topfile` (gmsh2top), `aerof/partition` (mpmetis, sower), [4b] (cd2tet, aerof2) | **cluster only** |
+
+`gmsh2top`, `sower`, `mpmetis`, `cd2tet` and `aerof2` live in
+`/home/groups/cfarhat/bin` and have no local equivalent, so everything from the
+`.top` conversion onward is cluster-only regardless of Python environment. The
+pure-Python tier imports none of them on purpose, which is what keeps curve
+generation, mesh-quality metrics and the Contract D reconstruction locally
+testable.
 
 ### [5] Moments
 - **Consumes:** 3D VDF data [3]; base state [4c] (defines the Maxwellian to expand
@@ -296,10 +375,46 @@ SPARTA run directory; the pickle is a cached/archived copy of that. Read through
 
 ### Contract D — Base state ([4c] → [5],[7])
 Per-station continuum base + slip correction + gradients.
-<!-- FILL IN: unchanged by the 2026-09-12 cleanup -- AERO-F work was out of scope
-     for that pass. fields -- (rho, u, T) at the wall reference; slip velocity;
-     temperature jump; near-wall dT/dn, du_t/dn; local pressure/Mach; units;
-     storage format. -->
+**Mechanism pinned down 2026-09-12; field list and storage format still open.**
+
+The important finding: **AERO-F cannot give you the tangential derivatives.**
+All its surface outputs are normal-projected — `HeatFluxPerUnitSurface` is
+`q·n = -κ ∂T/∂n`, `Force` is `τ·n` — and there is no gradient-tensor output
+(`PostFcn.h:40-43` exposes only `D2WALLGRAD`; `TEMPERATURENORMALDERIVATIVE = 33`
+at `PostFcn.h:32` is a dead enum slot with no keyword and no computation behind
+it).
+
+But the information exists: AERO-F builds the **full** tensor internally and
+only contracts at the last step (`PostFcn.C:1834` heat flux, `PostFcn.C:1256`
+viscous traction). So stage [4c] reconstructs the same operator in
+post-processing:
+
+```
+vol, dp1dxj = P1_gradient(tet_coords)    # == Elem::computeGradientP1Function
+grad_u = sum_i u_i (x) dp1dxj[i]         # full 3x3 tensor
+grad_T = sum_i T_i *  dp1dxj[i]          # full 3-vector
+```
+
+then project onto a local `(n, t1, t2)` basis per station. This is **not an
+approximation relative to the solver's own view** — it is bit-for-bit the
+operator AERO-F uses. Inputs needed: nodal `Velocity`/`Temperature` output
+(merged via `sower -fluid -merge` to ASCII xpost) plus the mesh connectivity,
+which this pipeline already has because it generated the mesh.
+
+Two consequences worth recording:
+- **Free correctness check:** in the one-cell extrusion the spanwise derivative
+  must be ≈ 0. Any appreciable value means the extraction is wrong.
+- **`SkinFrictionCoefficient` is unusable as-is:** `PostFcn.C:1246` hardcodes
+  `Vec3D t(1.0, 0.0, 0.0)`, so it reports the *x-component* of traction, not
+  the component tangential to the local surface. Acceptable for an airfoil at
+  small incidence; wrong for an arbitrary shape, where the tangent sweeps
+  through every direction. Use `Force` and decompose against each station's own
+  tangents.
+
+<!-- FILL IN, still open: the exact field list (rho, u, T at the wall reference;
+     slip velocity; temperature jump; dT/dn and du_t/dn plus their tangential
+     counterparts; local pressure/Mach), units, and on-disk storage format.
+     Also open: how station indices map onto a manifest file (Contract A). -->
 
 ### Contract E — Moments ([5] → [6])
 **Fully reconciled against the actual code (2026-09-12).** Two related structures:
@@ -371,8 +486,33 @@ Once green, relocation and refactors — yours or Claude Code's — are guarded.
 
 ## Open items
 
-- [ ] AERO-F solver parameters for compressible-flow convergence (argon cylinder).
-      Unchanged — out of scope for the 2026-09-12 cleanup.
+- [ ] **AERO-F solver parameters** (flux, CFL law, limiter, reconstruction,
+      supersonic startup). **User-owned**, informed by the AERO-F tutorials —
+      explicitly not a pipeline concern (see the M4 Amendment). Available flux
+      options: `Roe`, `VanLeer`, `HLLE`, `HLLC`, `RotatedRiemann`; no AUSM.
+- [ ] **`size_min_factor`** — M4's wall-gradient convergence study has not been
+      run, so case configs carry `FILL_IN` and the code falls back to
+      `perimeter/n_surf`. This is the one value blocking M4's mesh clause from
+      being fully satisfied.
+- [ ] **`n_station`** — M6 says ~30; `circle_1m.yaml` sets 30 against
+      `n_surf = 300`. The two are now independent but the number is a
+      placeholder.
+- [ ] **Station manifest format** (Contract A/D) — only indices are emitted
+      today. Interacts with the unresolved question of whether the geometry
+      notebook's circle-union "regions" are the same concept as M6's stations.
+- [ ] **Far-field rule** — M4 says "keyed to the shock-standoff correlation";
+      the mesh uses a fixed `20 D`.
+- [ ] **Shape family vs M10's convex scope** — the Bezier population produces
+      non-convex shapes with near-cusp spikes. M4 says sharp-edged geometries
+      get a hand-checked mesh, not the automated pipeline. `curves.validate()`
+      is the natural gate; the curvature threshold is a modeling choice.
+      Measured: M13's +x-ray check already rejects ~25% of the population
+      (2 of 8 on a pilot run) as non-star-convex, so the effective dataset
+      yield is ~75% before any curvature gate is added.
+- [ ] **Case config vs AERO-F input deck** — `config/cases/*.yaml` covers mesh
+      and geometry only; flow conditions and solver settings still live in the
+      `FluidFile` handled by `scripts/prep_aerof_case.sh`. Unifying them is
+      deliberate future work.
 - [x] Exact fields/formats for Contracts A–E (reconcile against existing code) —
       **C and E fully reconciled; A reconciled but flagged as possibly not the
       concept originally envisioned; B and D still open** (2026-09-12).

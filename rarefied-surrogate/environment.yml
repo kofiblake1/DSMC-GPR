@@ -1,3 +1,19 @@
+# LOCAL ONLY. The cluster deliberately uses a different environment -- see env.sh.
+#
+# Why they differ: Sherlock runs CentOS 7 with glibc 2.17, while current
+# numpy/scipy wheels target manylinux_2_28 (glibc >= 2.28). pip therefore cannot
+# install the numeric stack there (it falls back to a source build and fails), so
+# the cluster uses SRCC's on-site-compiled py-* Lmod modules instead, plus a small
+# venv holding only the pure-python remainder (tqdm, pyyaml).
+#
+# Conda works locally precisely because conda packages bundle their own runtime
+# and are immune to the host glibc -- which is also why conda is the conventional
+# answer on old clusters. We still prefer modules on Sherlock per SRCC guidance.
+#
+# Consequence to be aware of: package versions are NOT identical between local and
+# cluster. The cluster resolves python 3.12 / numpy 1.26.3 / pandas 2.2.1 (numpy is
+# pinned by py-pandas, see env.sh); a py3.10 conda env will resolve something else.
+# Keep behaviour-defining code free of version-sensitive numpy semantics.
 name: rarefied
 channels:
   - defaults

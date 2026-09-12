@@ -60,26 +60,39 @@ rarefied-surrogate/
   environment.yml            # conda env / dependencies      [done 2026-09-12]
   pyproject.toml             # makes src/ installable (pip install -e .)  [done 2026-09-12]
 
+  env.sh                     # CLUSTER environment (Lmod modules + small venv)  [2026-09-12]
+                             #   environment.yml is the LOCAL one; they differ
+                             #   deliberately -- see both files' headers
+
   config/
-    cases/                   # one config per case
+    cases/
+      circle_1m.yaml         #   reference mesh case (stage 4a)  [2026-09-12]
       argon_cylinder.yaml    #   the first validation case    <!-- TODO: create -->
-    schema.md                # what every config field means  <!-- TODO -->
+    schema.md                # what every config field means   [2026-09-12]
 
   src/rarefied/              # ALL logic lives here — importable, tested
     geometry/                # analytic shape + surface-station generation  [populated 2026-09-12]
+                             #   + curves.py, contact_sheet.py (AERO-F side)  [2026-09-12]
     sparta/                  # sampling-region + run setup for the custom interface
                              #   [C++ interface documented 2026-09-12, see its README.md;
                              #    no Python wrapper code yet]
-    aerof/                   # mesh + input-deck generation; base-state extraction  (still empty)
+    aerof/                   # mesh generation + partition  [populated 2026-09-12]
+                             #   geo, mshio, quality, topfile, partition, pipeline,
+                             #   quicklook, shapes_bridge, gmsh_env.sh
+                             #   base-state extraction (stage 4c) NOT yet written
     moments/                 # the hand-derived moment functions (canonical)  [populated 2026-09-12]
     reconstruct/             # moments + run info -> dimensional surface fluxes  [populated 2026-09-12]
     io/                      # loaders: pickles, VDF data, configs, registry  [populated 2026-09-12]
     features/                # feature-vector assembly (planned)  (still empty)
     models/                  # GP foundation + fine-tune (planned)  (still empty)
 
-  scripts/                   # thin CLI entry points; each calls into src/
-                             #   one per pipeline stage (see PIPELINE.md)
-                             #   still empty as of 2026-09-12 -- no CLI entry points yet
+  scripts/                   # thin CLI entry points; each calls into src/  [2026-09-12]
+    gen_mesh.py              #   stage 4a, one case
+    gen_mesh_batch.py        #   stage 4a, a dataset (+ .sbatch for arrays)
+    prep_aerof_case.sh       #   mesh + cd2tet + sower -> AERO-F file set
+    run_aerof.sh             #   mpirun aerof2
+    postpro_aerof.sh         #   sower -merge + xp2exo
+    run_aerof_variant.sh     #   solver-setting exploration (user-owned)
 
   notebooks/
     exploratory/             # fast, messy, disposable scratchpads (not pipeline)
@@ -98,8 +111,10 @@ rarefied-surrogate/
 
   docs/
     decisions/               # locked modeling decisions + rationale
-    handoffs/                # Claude Code handoff docs (argon-cylinder CFD, etc.)  <!-- still empty,
-                             #   see CLEANUP_TODO.md CONFIRM #7 -->
+                             #   M4 mesh clause amended, M12/M13 added  [2026-09-12]
+    handoffs/                # [populated 2026-09-12]
+      aerof_mesh_and_case2.md    #   stages 4a-4b: the verified recipe + traps
+      argon_cylinder_cfd.md      #   the first validation case (skeleton; resolves CONFIRM #7)
     CLEANUP_TODO.md           # [new, 2026-09-12] the dependency-ordered cleanup plan and its
                              #   full record of what was found, moved, and left as open CONFIRMs
 ```
@@ -186,17 +201,25 @@ cluster-connected session to confirm, not guessed at from here.
 ## Quickstart
 
 ```bash
-# 1. environment  [environment.yml created 2026-09-12; env name confirmed: rarefied]
+# 1a. LOCAL environment  [environment.yml created 2026-09-12]
 conda env create -f environment.yml
 conda activate rarefied
-
-# 2. make the package importable  [pyproject.toml created 2026-09-12]
 python3.10 -m pip install -e .
 
-# 3. run a stage (see PIPELINE.md for the full list)
-python scripts/<stage>.py --case config/cases/argon_cylinder.yaml   # <!-- TODO: no
-                                                                     #      scripts/ entry
-                                                                     #      points exist yet -->
+# 1b. CLUSTER environment -- deliberately different, see env.sh's header.
+#     Sherlock is CentOS 7 / glibc 2.17 and current numpy/scipy wheels need
+#     glibc >= 2.28, so pip cannot build the numeric stack there; the SRCC
+#     py-* modules are used instead, plus a small venv for tqdm/pyyaml.
+source env.sh                              # sets PYTHONPATH; no pip install -e needed
+
+# 2. run a stage (see PIPELINE.md for the full list)
+#    Stage [4a]/[4b] are CLUSTER-ONLY and need a Slurm allocation -- gmsh,
+#    gmsh2top, mpmetis, sower and aerof2 have no local equivalent.
+srun -p dev -c 4 --mem=16G -t 00:30:00 --pty bash
+source env.sh
+python3 scripts/gen_mesh.py --case config/cases/circle_1m.yaml   # stage [4a]
+./scripts/prep_aerof_case.sh && ./scripts/run_aerof.sh           # stage [4b]
+# stages [1],[2],[3],[5],[6] still have no CLI entry point  <!-- TODO -->
 
 # 4. verify a relocation didn't change behavior (2026-09-12 -- NOT the same as #5 below)
 python3.10 tests/characterization/build_reference.py   # freezes current output

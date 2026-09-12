@@ -1,0 +1,91 @@
+# Dataset registry (decision E3): dataset name -> path, format, provenance.
+#
+# Code resolves data paths THROUGH this file, never hard-coded.
+#
+# This file is committed; the data it points at is not. Note that until the
+# 2026-09-12 .gitignore fix it was *uncommittable*: a bare `data/` rule excluded
+# the directory, and git cannot re-include a file inside an excluded directory,
+# so the `!data/registry.yaml` negation never fired. The rule is now `data/*`.
+# Verify with: git check-ignore -v data/registry.yaml
+#
+# `confidence` is stated per entry rather than assumed uniformly:
+#   verified            - content inspected and matches the documented schema
+#   unverified          - path exists, content not inspected
+#   incompatible_format - present but does NOT match the expected schema
+#
+# STORAGE LIFETIME: $SCRATCH (/scratch/users/kofib) is purged after 90 days
+# without content modification. `touch`, rename and chmod do NOT reset the
+# timer. Mesh outputs are regenerable by design and therefore fine there;
+# anything expensive to reproduce must move to $GROUP_HOME.
+
+datasets:
+
+  # ------------------------------------------------------------------
+  # Stage [4a] mesh outputs -- regenerable from config + code
+  # ------------------------------------------------------------------
+
+  circle_1m_mesh:
+    description: >
+      Reference 1 m circle mesh: the stage [4a] validation target. Analytic
+      geometry, so every mesh quantity has an exact expected value.
+    cluster_path: /scratch/users/kofib/rs_verify/circle_1m
+    local_path: null            # cluster-only; regenerate rather than copy
+    format: >
+      per-case directory: .geo, .msh (MSH 2.2), .top, .top.dec.4,
+      sower output (.msh1/.dec1/.con/.4cpu), .png, .vtu, .quality.txt,
+      .record.json
+    provenance:
+      case: config/cases/circle_1m.yaml
+      command: python3 scripts/gen_mesh.py --case config/cases/circle_1m.yaml
+      stage: "[4a]"
+      notes: >
+        Quality gate passes with zero problems: wall area 0.157077 (= polygon
+        perimeter x thickness, not pi*D*t), volume rel err -0.040%, 0
+        non-positive tet volumes, 600 wall nodes at r = 0.5 to 7.85e-17,
+        aspect ratio median 7.79 / max 28.5.
+    confidence: verified
+    regenerable: true
+
+  aerof_case2_circle:
+    description: >
+      FRG short-course Case2 (SteadyViscousPG) reproduced on the 1 m circle.
+      A SMOKE TEST of the solver chain, NOT a physics case for this project --
+      it uses the tutorial's air (gamma 1.4, R 287.1, Pr 0.72) with a turbulent
+      closure and wall functions at Re 4.5e5, all three contrary to M3/M4's
+      laminar-argon requirement.
+    cluster_path: /scratch/users/kofib/aerof_case2
+    local_path: null
+    format: >
+      tutorial layout: sources/, data/fluidmodel.*, simulations/Case2/
+      (FluidFile, log.out, results/, references/, postpro/Case2.exo)
+    provenance:
+      case: FluidFile byte-identical to
+        $GROUP_HOME/FRG_ShortCourses/FolderCases1To4/simulations/Case2/FluidFile
+        apart from its geometry comment
+      command: scripts/prep_aerof_case.sh && scripts/run_aerof.sh && scripts/postpro_aerof.sh
+      stage: "[4b]"
+      notes: >
+        1000 iterations in ~88 s on 4 MPI ranks; residual 1.0 -> 3.743647e-07.
+        Bit-for-bit reproducible across two independent from-scratch runs.
+        NOTE this differs from the 7.031645e-06 recorded before the M13
+        clockwise flip: reordering the curve points changed gmsh's
+        triangulation slightly (10570 nodes / 30426 tets, was 10576 / 30444),
+        so the discrete solution differs. The mesh gate passes identically in
+        both cases; the residual is mesh-specific, not a regression.
+        Forces (99.9, -34.8, 2.1e-4) N: Cd = 0.19 against frontal area D*t,
+        but the 24-degree misalignment from the 5-degree freestream is a real
+        spurious side force -- a steady solve of a bluff body at Re 4.5e5 has
+        no steady solution and locks into one asymmetric separation pattern.
+    confidence: verified
+    regenerable: true
+
+  # ------------------------------------------------------------------
+  # SPARTA-side inputs -- see the parent-repo CONFIRM items; NOT touched
+  # by the stage [4a] fold-in. cluster_path for these remains open
+  # (CONFIRM #8): do not fabricate a plausible path.
+  # ------------------------------------------------------------------
+  # The KN_eq_* pickle entries and shape_dataset_2026_02_06_09_28_35 were
+  # populated on the laptop during the 2026-09-12 cleanup but never reached
+  # the cluster, because this file was uncommittable (see the header). Re-add
+  # them from that local copy; their cluster_path stays FILL_IN until
+  # confirmed. Deliberately not reconstructed from memory here.

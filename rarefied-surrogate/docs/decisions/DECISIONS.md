@@ -108,18 +108,58 @@ This is a single-file log for now because the repo is mid-reorganization. When i
 
 **Second-order slip:** rejected for now (no agreed coefficients; needs a noisier 2nd normal derivative; benefit only above Kn~0.5 where the base is dubious anyway). Journal-scope at most.
 
+**Corroborated 2026-09-12 — the premise is stronger than stated.** This entry's context says "AERO-F has no built-in slip model." The source in fact contains a *partially implemented but entirely dead* Maxwell slip model, which supports the a-posteriori decision rather than undermining it. Do not be misled into thinking the built-in path is usable:
+
+- `Face::computeMaxwellSlipTerm` (`Face.C:806-809`) is an **empty stub**, and it is the only possible caller of `Elem::computeMaxwellSlipTerm`.
+- `SubDomain::computeMaxwellSlipTerm` (`SubDomain.C:2315`) has **no callers anywhere** in the tree.
+- `MaxwellSlipData::zeroconstant` **defaults to 0.0** and multiplies *both* terms in `MaxwellSlipFcn::compute` (`SlipFcn.h:35`), so the kernel returns zero slip velocity even if reached.
+- There is **no temperature jump** at all (no `TemperatureJump`/`Smoluchowski` anywhere). First-order Maxwell slip needs both; velocity slip alone over-predicts wall heat flux.
+- The intended integration point is the ROM hyperreduction path (`sampleFaces`, assignment rather than accumulation), not the standard residual assembly.
+- It exists only in `aero-f-2`, not `aero-f` or `aero-f-lite`.
+
+Making it work would be a solver project — implement the face hook, wire it into residual assembly over all wall faces, set `ZeroConstant`, and add the missing temperature jump — not a configuration change. M3's post-processing route remains the correct call.
+
 ---
 
 ## M4 — Laminar (no turbulence model); wall-gradient convergence study replaces y+; no solution-adaptive refinement `[model]`
-**Status:** Accepted
+**Status:** Accepted — **mesh-topology clause amended 2026-09-12** (see *Amendment* at the end of this entry)
 
 **Context.** Reynolds number across 90–120 km is ~10^3 at the dense-end worst case (checked: 90 km, L=10 m, M=20 gives Re ~1.5e4; typical meter-scale ~200) versus transition ~5e5–1e6. Rarefaction forces low Re.
 
-**Decision.** Use **laminar** compressible NS — no RANS, no LES. Because turbulence is absent, the **y+ apparatus does not apply**; instead a **wall-gradient convergence study** (refine near-wall spacing until wall heat flux and shear stop changing) sets and freezes the spacing, since the wall-normal gradients are the consumed product. Use a fixed **hyperbolic-extrusion** mesh topology on convex bodies with a **carbuncle-resistant flux** (AUSM-type) and stagnation-region resolution; far-field distance keyed to the shock-standoff correlation. **No solution-adaptive mesh refinement.**
+**Decision.** Use **laminar** compressible NS — no RANS, no LES. Because turbulence is absent, the **y+ apparatus does not apply**; instead a **wall-gradient convergence study** (refine near-wall spacing until wall heat flux and shear stop changing) sets and freezes the spacing, since the wall-normal gradients are the consumed product. Use a fixed **graded unstructured (gmsh) mesh topology** on convex bodies, with a **scale-relative sizing rule** so the discretization bias is consistent across the geometry sweep, and stagnation-region resolution; far-field distance keyed to the shock-standoff correlation. **No solution-adaptive mesh refinement.** *(Amended 2026-09-12 — was "hyperbolic-extrusion … with a carbuncle-resistant flux (AUSM-type)". See the Amendment note below.)*
 
 **Rejected — RANS/LES:** would inject spurious eddy viscosity into a flow with none, corrupting the near-wall gradients. **Rejected — adaptive refinement:** makes discretization error (hence base bias) a solution-dependent function per case, breaking the base-consistency the corrector marriage depends on. Consistency across the geometry sweep beats peak per-case shock sharpness.
 
 **Consequences.** The residual meshing difficulty concentrates at the leading-edge/stagnation station (shortest gradient length) — run the W1 wall-gradient study at the bluntest, highest-Mach case. Sharp-edged geometries (flat panel) get a hand-checked mesh, not the automated pipeline.
+
+---
+
+### Amendment (2026-09-12): mesh topology and flux
+
+Two clauses of the decision above were written before the AERO-F source and option set had been read. Both are corrected here rather than silently overridden; the laminar, no-adaptive-refinement, and wall-gradient-study clauses are **unchanged and still in force**.
+
+**1. Hyperbolic extrusion → graded unstructured gmsh.**
+
+The original rationale for hyperbolic extrusion was to guarantee clean wall-normal gradients by making mesh lines orthogonal to the wall. That turns out to be unnecessary, because **AERO-F never uses mesh orthogonality to form them.** For each boundary face it builds the *full* gradient tensor from the attached tetrahedron's P1 shape-function gradients and only then contracts with the face normal:
+
+- heat flux — `PostFcnNS::computeHeatPower`, `PostFcn.C:1834`: `computeTemperatureGradient(dp1dxj, T, dTdxj)` → `computeHeatFluxVector(kappa, dTdxj, qj)` → `q·n`
+- viscous traction — `computeViscousForce`, `PostFcn.C:1256`: `computeVelocityGradient(dp1dxj, u, dudxj)` → `computeStressTensor` → `tij·n`
+
+The P1 gradient is exact for a linear field on any non-degenerate tet, so element orthogonality never enters the consumed product. What *does* set the error is near-wall **spacing** — which is precisely what M4's wall-gradient convergence study already governs.
+
+The replacement serves M4's real intent (consistent discretization bias across the sweep, so the corrector's base stays consistent) by a different mechanism: every mesh length is expressed as a fraction of the shape's characteristic diameter `D`, making the sizing rule scale-invariant. See `config/schema.md`.
+
+Practical consequence: this removes the pyHyp toolchain (CGNS + PETSc + cgnsutilities, none of which are available as Sherlock modules) from the critical path entirely.
+
+**2. AUSM-type flux → not used, and not available.**
+
+AERO-F offers only `Roe`, `VanLeer`, `HLLE`, `HLLC`, `RotatedRiemann` (`IoDataCore.C:3313-3315`). There is no AUSM option, so the original clause was unimplementable as written.
+
+**We are not using an AUSM flux.** AERO-F handles shock waves and discontinuities perfectly well with its available schemes; the earlier clause reflected a concern about blunt-body carbuncles that is better addressed through solver configuration than through a flux the code does not have.
+
+**Selecting the solver settings** — flux, CFL law, limiter, reconstruction, and the startup strategy for supersonic cases — is a separate task, owned by the user and informed by the AERO-F tutorials. It is deliberately **not** a pipeline concern and is not decided here. The mesh pipeline is agnostic to all of it.
+
+**3. One further gap this exposed, recorded not decided.** Stage [4c] needs *tangential* wall derivatives as well as normal ones, and AERO-F exposes neither a gradient tensor nor a tangential derivative: the `VectorType` enum (`PostFcn.h:40-43`) offers only `D2WALLGRAD`, and `TEMPERATURENORMALDERIVATIVE = 33` (`PostFcn.h:32`) is a dead enum slot with no input keyword and no computation behind it. So stage [4c] must reconstruct the P1 tet gradient itself in post-processing — bit-for-bit the same operator quoted above. See `PIPELINE.md` Contract D.
 
 ---
 
@@ -205,6 +245,48 @@ This is a single-file log for now because the repo is mid-reorganization. When i
 **Decision (tentative).** Default to taking `a_0`/density **externally from the base solver** (keeps the normalized shape corrections O(1) and interpretable). **If** the W1 diagnostic shows the base's near-wall density error is not smooth/small at the target Kn, add a **learned `a_0` correction** — a density correction on top of the base density, using the same GP machinery as the higher moments — rather than folding scale into the shape regression.
 
 **Consequences.** Decision finalizes after the W1 measurement. Keep scale (`a_0`) and shape (`a_{k>=1}`) corrections separable either way, to preserve the interpretable decomposition.
+
+---
+
+## M12 — Mesh generation is gmsh-driven; the pipeline is cluster-only from stage [4a] `[eng]`
+**Status:** Accepted (2026-09-12)
+
+**Context.** M4's amended mesh clause needs a concrete tool. Two constraints decided it. First, `gmsh2top` — the only route from a mesh to an AERO-F `.top` — accepts **only** element types 2 (triangle) and 4 (tetrahedron), and cannot read MSH 4.1 (its version-4 branch was written against 4.0). Second, Sherlock's `gmsh/4.10.1` module forces `gcc/10.1.0`, which breaks the py312 numeric stack the rest of the package runs on, and the pip `gmsh` wheel cannot load at all because `libGLU.so.1` is absent cluster-wide.
+
+**Decision.** Generate a `.geo` from the curve and invoke the **gmsh CLI as a subprocess** in its own module environment (`src/rarefied/aerof/gmsh_env.sh`); never import gmsh into the Python process. Always write **MSH 2.2**, and never use `Recombine`, so extruding a triangulated surface yields tetrahedra.
+
+**Consequences.** The `.geo` is a human-inspectable artifact that mirrors the group's working `NACA0012.geo`, which is a side benefit rather than a cost. It also fixes the capability boundary: stages from [4a] onward need `gmsh`, `gmsh2top`, `mpmetis`, `sower`, `cd2tet`, `aerof2` — all group-installed in `/home/groups/cfarhat/bin`, with **no local equivalent**. The pure-Python layer (`geometry/curves`, `aerof/mshio`, `aerof/quality`) deliberately imports none of them and runs anywhere, so curve generation, mesh-quality metrics, and the eventual Contract D reconstruction stay locally testable. Documented, not enforced in code.
+
+---
+
+## M13 — Surface stations are ordered clockwise, anchored on the +x ray `[model]`
+**Status:** Accepted (2026-09-12)
+
+**Context.** M6 makes shared surface stations the DSMC↔CFD registration layer, pairing the two solvers by station id. That only works if both sides agree on the ordering. They did not: the SPARTA-side generator `geometry/circle.py:51` emits points **clockwise** (`np.linspace(0, -2*np.pi, …)`), while the new AERO-F-side curve module was written **counter-clockwise**. An orientation mismatch reverses station ids everywhere except index 0 — and on a symmetric test shape it would look fine in aggregate while being wrong point-by-point.
+
+**Decision.** **Clockwise, project-wide.** Station 0 is anchored where the **+x ray from the area centroid** crosses the surface, proceeding clockwise.
+
+The constraint ordering made this nearly forced:
+
+| side | requirement | source |
+|---|---|---|
+| SPARTA | **clockwise, hard** | external requirement on surface node definition |
+| AERO-S / existing coupling | **clockwise** | `notebooks/mesh_pipeline/mesh_export.py:76`, `np.argsort(-angles)` |
+| AERO-F | **indifferent** | repairs orientation itself, see below |
+
+AERO-F is orientation-agnostic, demonstrated rather than assumed: `GeoSource.C:340` calls `Elem::checkVolume` (`ElemCore.C:150-160`), which swaps nodes 1↔2 on any negative-volume tet at load time, and the reference circle run reported `changed the orientation of 11004 boundary faces` (of 21152) while still producing correct physics (stagnation at the nose, M≈0.87 over the shoulders, Cd≈0.19, `Lz/|F| = 2e-6`).
+
+One side has a hard requirement, one already complies, the third is free. Clockwise also **invalidates nothing**: `circle.py`, the archived `KN_eq_*` pickles, and `tests/characterization/geometry_reference.npz` are all untouched.
+
+**Consequences.**
+- `signed_area()` is **negative** for a valid curve; callers wanting magnitude must use `abs()`.
+- `aerof/geo.py` reverses to counter-clockwise internally for gmsh's `Plane Surface`. That is private and non-load-bearing (AERO-F repairs face orientation anyway); station indices are always defined on the clockwise input.
+- The +x-ray anchor is required for station ids to be **reproducible across shapes** — without it, index 0 falls wherever the input curve happened to start, which for a Bezier shape is arbitrary.
+- Shapes whose +x ray crosses the surface more than once have an **ambiguous** origin and are **rejected** by `curves.validate`. This is consistent with M10's convex-body scope and drops into the batch driver's existing reject/retry loop. Note a single closed loop always has an odd crossing count, so the failure mode is 3+, not 0 — and a shape that is star-convex about its centroid always has exactly 1.
+
+**Rejected alternative — standardize on counter-clockwise** (the mathematical convention, and what positive shoelace area implies): impossible, because SPARTA's requirement is external and non-negotiable, and flipping the SPARTA side would invalidate the archived pickles this project's own characterization reference depends on.
+
+**Rejected alternative — keep both conventions with an index-mapping helper** (`i → (n-i) % n`): preserves existing data but leaves two live conventions in a codebase whose whole premise is that station ids pair one-to-one. The mapping would be correct exactly until someone forgot to call it.
 
 ---
 

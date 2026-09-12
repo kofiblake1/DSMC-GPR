@@ -1,0 +1,56 @@
+# Reference mesh case: 1 m diameter circle.
+#
+# This is the validation target for stage [4a], not a physics case. The circle
+# is analytic, so every mesh quantity has an exact expected value and the
+# quality gate can check against it rather than against a previous run:
+#   wall area     = polygon perimeter x thickness   (NOT pi*D*t -- see below)
+#   volume        = (pi R^2 - A_shape) x thickness
+#   wall nodes    = 2 x n_surf, at exactly r = D/2
+#
+# Note the wall area check uses the *polygon* perimeter (3.14154 for a 300-gon
+# on a 1 m circle), not pi. The mesh represents the polygon, not the circle it
+# approximates, and conflating the two would hide a real 2e-5 discrepancy.
+#
+# Field meanings: see config/schema.md.
+
+name: circle_1m
+
+geometry:
+  source: circle           # analytic; the exact validation target
+  diameter: 1.0            # m
+  n_surf: 300              # wall points = mesh wall nodes (M4 resolution)
+  n_station: 30            # shared surface stations (M6 registration layer)
+
+mesh:
+  # All lengths are fractions of the characteristic diameter D, so the sizing
+  # rule is scale-invariant across a geometry sweep (M4's base-consistency aim).
+  reference_diameter: 1.0  # pin D exactly; 0 => derive from enclosed area
+
+  # NEAR-WALL SPACING. M4 requires this from a wall-gradient convergence study
+  # (refine until wall heat flux and shear stop changing), not from y+ and not
+  # from the station count. That study has NOT been run.
+  #
+  # FILL_IN: replace with the converged value as a fraction of D. Until then
+  # geo.py falls back to perimeter/n_surf (= 0.01047 D here), which is
+  # self-consistent but couples mesh resolution to n_surf -- exactly the
+  # coupling M4 and M6 need broken.
+  size_min_factor: 0.0     # FILL_IN (0 => fallback)
+
+  size_max_factor: 1.0     # far-field target cell size = 1 D
+  growth_rate: 0.15        # cell-to-cell growth; dist_max is derived from it
+  farfield_factor: 20.0    # outer radius = 20 D
+                           # NOTE: M4 says "keyed to the shock-standoff
+                           # correlation"; 20 D is a fixed stand-in.
+  thickness_factor: 0.05   # extrusion span = 0.05 D, matching the FRG
+                           # short-course mesh. Keeps near-wall tets
+                           # well-shaped: at 1.0 D the aspect ratio was
+                           # median 29 / max 288; at 0.05 D it is 7.8 / 28.5.
+  extrude_axis: z          # shape in x-y, extruded +z. Required by AERO-F's
+                           # freestream convention: with Alpha = 0,
+                           # w = V sin(alpha) = 0, so nothing crosses the side
+                           # planes (DistTimeState.C:321-323).
+  algorithm: 6             # gmsh Frontal-Delaunay
+  optimize: true
+
+partition:
+  nparts: 4                # subdomains for mpmetis + sower
