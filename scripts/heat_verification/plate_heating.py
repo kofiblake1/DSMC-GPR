@@ -532,7 +532,7 @@ def main():
     m_Ar = 39.948*AMU
     params = dict(
         n_inf=1.0e20, T_inf=350.0, m_mol=m_Ar, M=5.0, gamma_gas=5/3,
-        alpha_deg=-15.0, sigma=1.0,
+        alpha_deg=5.0, sigma=1.0,
         a=0.06, b=0.02,                 # chord 60 mm, thickness 20 mm
         k_s=0.02, rho_cp=5.0e5,         # low-k ceramic -> Biot ~ 1.5 (finite-Biot regime)
         T0=300.0,                       # start cold and uniform
@@ -541,7 +541,7 @@ def main():
     print("="*66)
     print("Mach 5 argon plate  --  Robin (self-regulating) model")
     print("="*66)
-    robin = RobinHeat2D.from_freestream_plate(n_modes_x=32, n_modes_y=32, **params)
+    robin = RobinHeat2D.from_freestream_plate(n_modes_x=50, n_modes_y=50, **params)
     robin.meta["alpha_deg"] = params["alpha_deg"]
     mt = robin.meta
     print(f"c_m={mt['c_m']:.1f} m/s  S={mt['S']:.3f}  U={mt['U']:.1f} m/s")

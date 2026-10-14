@@ -34,11 +34,12 @@ from scipy.signal import butter, find_peaks, sosfiltfilt
 # ============================================================================
 # CONFIG -- point this at whichever run's output you want to analyze.
 # ============================================================================
-#RUN_DIR = "/Volumes/SherlockScratch/DSMC_FEM_VALIDATION_P1/BEAM_LOCKIN/PHASE_1"
-RUN_DIR = "/Volumes/SherlockScratch/DSMC_FEM_VALIDATION_P1/BEAM_LOCKIN/PHASE_4R_DIAGNOSTIC/RUN1_rho08_long/"
+LOAD_DIR = "/Volumes/SherlockScratch/DSMC_FEM_VALIDATION_P1/BEAM_LOCKIN/PHASE_5_FINAL/SWEEP/f1_0p95"
+# LOAD_DIR = "/Volumes/SherlockScratch/DSMC_FEM_VALIDATION_P1/BEAM_LOCKIN/PHASE_4R_DIAGNOSTIC/RUN1_rho08_long/"
 
-LIFT_DRAG_FILE = os.path.join(RUN_DIR, "EXAMPLE_BEAM", "lift_drag.dat")
-GDISPLAC_FILE = os.path.join(RUN_DIR, "results_beam", "gdisplac")
+# LIFT_DRAG_FILE = os.path.join(LOAD_DIR, "EXAMPLE_BEAM", "lift_drag.dat")
+LIFT_DRAG_FILE = os.path.join(LOAD_DIR, "EXAMPLE_BEAM", "lift_drag.dat")
+GDISPLAC_FILE = os.path.join(LOAD_DIR, "results_beam", "gdisplac")
 OUTPUT_DIR = os.getcwd() #RUN_DIR  # PNGs land here; change if you'd rather they land elsewhere
 
 # Only look at data after this SPARTA absolute time (matches the original
@@ -68,7 +69,7 @@ RESTART_TIME_OFFSET = 0#250000 * 1e-5
 # either behavior.
 # TIP_COMPONENT = 'y'
 # TIP_COMPONENT = 'x'
-TIP_COMPONENT = 'y'
+TIP_COMPONENT = 'x'
 
 # Peak-detection threshold in fft_and_peaks(), as a fraction of that
 # signal's own peak FFT magnitude (not a fixed absolute value -- lift, drag,
